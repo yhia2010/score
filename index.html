@@ -1,0 +1,2186 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>新安中学2023级高三学生往年成绩查询系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- 外部库异步加载，不阻塞页面 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #1a5c3a;
+      --primary-light: #2e8b57;
+      --primary-dark: #0f3d26;
+      --secondary: #3aaa6e;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --bg: #f0f4f2;
+      --bg-card: #ffffff;
+      --text: #0f1a12;
+      --text-muted: #3d5a47;
+      --border: #c8dfd1;
+      --shadow: 0 4px 24px rgba(26,92,58,0.10);
+      --shadow-lg: 0 12px 40px rgba(26,92,58,0.15);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+    }
+    body {
+      font-family: 'Noto Sans SC', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes slideDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes shimmer { 0% { background-position:-200% 0; } 100% { background-position:200% 0; } }
+    @keyframes float { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-8px); } }
+    @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.6; } }
+    .anim-fade-up { animation: fadeInUp 0.5s ease-out both; }
+    .anim-fade { animation: fadeIn 0.4s ease-out both; }
+
+    /* ===== NAVBAR ===== */
+    .navbar {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
+      color: #fff;
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 20px rgba(26,92,58,0.3);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .navbar-brand {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .navbar-brand svg { width: 28px; height: 28px; }
+    .navbar-brand img.logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.3); }
+    .navbar-tabs { display: flex; gap: 4px; }
+    .nav-tab {
+      padding: 8px 18px; border-radius: 8px; cursor: pointer;
+      font-size: 0.9rem; font-weight: 500; transition: all 0.25s;
+      background: transparent; color: rgba(255,255,255,0.75); border: none;
+    }
+    .nav-tab:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .nav-tab.active { background: rgba(255,255,255,0.2); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+    /* ===== LAYOUT ===== */
+    .page { display: none; min-height: calc(100vh - 64px); }
+    .page.active { display: block; }
+
+    /* ===== HERO ===== */
+    .hero {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--secondary) 100%);
+      color: #fff; text-align: center; padding: 64px 24px 88px;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.08) 0%, transparent 50%),
+                  radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06) 0%, transparent 50%);
+    }
+    .hero::after {
+      content: '';
+      position: absolute; bottom: -2px; left: 0; right: 0; height: 60px;
+      background: linear-gradient(to top, var(--bg), transparent);
+    }
+    .hero h1 { font-size: clamp(1.5rem, 4vw, 2.4rem); font-weight: 700; margin-bottom: 14px; position: relative; z-index: 1; line-height: 1.4; }
+    .hero p { font-size: 1.05rem; opacity: 0.85; max-width: 520px; margin: 0 auto 0; position: relative; z-index: 1; line-height: 1.7; }
+
+    /* ===== QUERY CARD ===== */
+    .query-section {
+      max-width: 520px; margin: -40px auto 0; padding: 0 16px 48px;
+      position: relative; z-index: 10;
+    }
+    .card {
+      background: var(--bg-card); border-radius: var(--radius);
+      box-shadow: var(--shadow-lg); padding: 32px;
+      border: 1px solid rgba(200,223,209,0.5);
+      transition: box-shadow 0.3s;
+    }
+    .card:hover { box-shadow: 0 16px 48px rgba(26,92,58,0.18); }
+    .card-title {
+      font-size: 1.1rem; font-weight: 700; color: var(--primary);
+      margin-bottom: 24px; display: flex; align-items: center; gap: 8px;
+    }
+    .form-group { margin-bottom: 18px; }
+    .form-label {
+      display: block; font-size: 0.875rem; font-weight: 600;
+      color: var(--text); margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%; padding: 12px 16px; border: 2px solid var(--border);
+      border-radius: var(--radius-sm); font-size: 0.975rem;
+      font-family: inherit; color: var(--text); background: #f8fafc;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s; outline: none;
+    }
+    .form-input:focus {
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 4px rgba(46,139,87,0.12);
+      background: #fff;
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px; padding: 12px 28px; border-radius: var(--radius-sm);
+      font-size: 0.975rem; font-weight: 600; cursor: pointer;
+      border: none; transition: all 0.25s; font-family: inherit;
+      position: relative; overflow: hidden;
+    }
+    .btn::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .btn:hover::after { opacity: 1; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: #fff; box-shadow: 0 4px 16px rgba(26,92,58,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(26,92,58,0.4); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-secondary {
+      background: #f1f5f9; color: var(--text); border: 2px solid var(--border);
+    }
+    .btn-secondary:hover { background: #e8f0eb; border-color: var(--primary-light); }
+    .btn-success {
+      background: linear-gradient(135deg, #059669, var(--success));
+      color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    }
+    .btn-success:hover { transform: translateY(-2px); }
+    .btn-danger {
+      background: linear-gradient(135deg, #dc2626, var(--danger));
+      color: #fff; box-shadow: 0 4px 12px rgba(239,68,68,0.2);
+    }
+    .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(239,68,68,0.35); }
+    .btn-sm { padding: 7px 14px; font-size: 0.825rem; border-radius: var(--radius-xs); }
+    .btn-full { width: 100%; }
+    .error-msg {
+      color: var(--danger); font-size: 0.85rem; margin-top: 6px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    /* ===== RESULTS ===== */
+    .results-section { max-width: 100%; margin: 0 auto; padding: 32px 16px 20px; }
+    .student-header {
+      display: flex; align-items: center; gap: 20px;
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary), var(--primary-light));
+      color: #fff; border-radius: var(--radius); padding: 28px 32px;
+      margin-bottom: 24px; box-shadow: var(--shadow-lg);
+      position: relative; overflow: hidden;
+    }
+    .student-header::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at 85% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
+    }
+    .student-avatar {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); display: flex;
+      align-items: center; justify-content: center; font-size: 1.6rem;
+      font-weight: 700; flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.3);
+      backdrop-filter: blur(4px);
+    }
+    .student-info h2 { font-size: 1.3rem; font-weight: 700; }
+    .student-info p { opacity: 0.85; font-size: 0.9rem; margin-top: 4px; }
+    .student-stats {
+      margin-left: auto; display: flex; gap: 28px; position: relative; z-index: 1;
+    }
+    .stat-item { text-align: center; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; }
+    .stat-label { font-size: 0.75rem; opacity: 0.75; margin-top: 2px; }
+
+    /* Summary cards */
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 16px; margin-bottom: 28px;
+    }
+    .summary-card {
+      background: #fff; border-radius: var(--radius-sm); padding: 20px 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06); border-left: 4px solid var(--primary);
+      transition: transform 0.25s, box-shadow 0.25s;
+      border: 1px solid rgba(200,223,209,0.4);
+      border-left: 4px solid var(--primary);
+    }
+    .summary-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+    .summary-card.green { border-left-color: var(--success); }
+    .summary-card.amber { border-left-color: var(--accent); }
+    .summary-card.red { border-left-color: var(--danger); }
+    .summary-card.sky { border-left-color: var(--secondary); }
+    .summary-card .label { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+    .summary-card .value { font-size: 1.5rem; font-weight: 700; color: var(--text); margin-top: 4px; }
+    .summary-card .sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 9px 18px; border-radius: var(--radius-sm); cursor: pointer;
+      font-size: 0.875rem; font-weight: 500; border: 2px solid var(--border);
+      background: #fff; color: var(--text-muted); transition: all 0.25s; font-family: inherit;
+    }
+    .tab-btn:hover { border-color: var(--primary-light); color: var(--primary); background: #f0f9f4; }
+    .tab-btn.active {
+      background: var(--primary); border-color: var(--primary);
+      color: #fff; box-shadow: 0 2px 8px rgba(26,92,58,0.25);
+    }
+    .tab-panel { display: none; animation: fadeIn 0.35s ease-out; }
+    .tab-panel.active { display: block; }
+
+    /* Score table */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); position: relative; }
+    .table-wrap::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 30px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.8)); pointer-events: none; z-index: 2; }
+    .table-wrap.no-scroll::after { display: none; }
+    table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.85rem; min-width: max-content; }
+    thead tr { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eef2ef; white-space: nowrap; }
+    thead th { border-bottom: none; font-weight: 600; letter-spacing: 0.02em; }
+    tbody tr { transition: background 0.15s; }
+    tbody tr:hover { background: #f0f9f4; }
+    tbody tr:nth-child(even) { background: #fafcfa; }
+    tbody tr:nth-child(even):hover { background: #eef7f1; }
+    tbody tr:last-child td { border-bottom: none; }
+    .score-badge {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-weight: 600; font-size: 0.82rem;
+    }
+    .score-a { background: #dcfce7; color: #166534; }
+    .score-b { background: #d4eddf; color: #1a5c3a; }
+    .score-c { background: #fef9c3; color: #854d0e; }
+    .score-d { background: #fee2e2; color: #991b1b; }
+    .rank-tag {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 32px; padding: 2px 8px; border-radius: 6px;
+      font-weight: 700; font-size: 0.82rem;
+      background: #fff3cd; color: #856404;
+    }
+    .rank-sub {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 28px; padding: 1px 6px; border-radius: 4px;
+      font-size: 0.78rem; font-weight: 600;
+      background: #f0f4f2; color: var(--text-muted);
+    }
+
+    /* Chart */
+    .chart-card { background: #fff; border-radius: var(--radius); padding: 24px; margin-top: 20px; box-shadow: var(--shadow); border: 1px solid rgba(200,223,209,0.4); }
+    .chart-title { font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .chart-wrap { position: relative; height: 280px; }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+    @media (max-width: 640px) { .charts-grid { grid-template-columns: 1fr; } }
+
+    /* ===== ADMIN PAGE ===== */
+    .admin-page { background: var(--bg); min-height: calc(100vh - 64px); }
+    .admin-login { max-width: 420px; margin: 60px auto; padding: 0 16px; }
+    .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 28px 16px 48px; }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+    }
+    .admin-header h2 { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+    .section-card {
+      background: #fff; border-radius: var(--radius); padding: 24px; margin-bottom: 24px;
+      box-shadow: var(--shadow); border: 1px solid rgba(200,223,209,0.4);
+      transition: box-shadow 0.25s;
+    }
+    .section-card:hover { box-shadow: var(--shadow-lg); }
+    .section-card h3 { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+    .upload-zone {
+      border: 2.5px dashed var(--border); border-radius: var(--radius-sm);
+      padding: 36px 24px; text-align: center; cursor: pointer;
+      transition: all 0.3s; background: #f8fafc;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--primary-light); background: #edf7f1; transform: scale(1.005); }
+    .upload-zone svg { width: 40px; height: 40px; color: var(--primary-light); margin-bottom: 12px; }
+    .upload-zone p { color: var(--text-muted); font-size: 0.9rem; }
+    .upload-zone span { font-weight: 600; color: var(--primary); }
+    #file-input { display: none; }
+    .import-preview { margin-top: 18px; }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-amber { background: #fef9c3; color: #854d0e; }
+    .progress-bar-wrap { background: #e2e8f0; border-radius: 20px; height: 6px; margin: 8px 0; }
+    .progress-bar { background: linear-gradient(90deg, var(--primary), var(--primary-light)); height: 100%; border-radius: 20px; transition: width 0.4s; }
+    .alert { padding: 12px 16px; border-radius: var(--radius-sm); font-size: 0.9rem; margin-bottom: 16px; display: none; align-items: center; gap: 10px; }
+    .alert.show { display: flex; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .alert-info { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+    .data-table-wrap { max-height: 360px; overflow-y: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .data-table-wrap table thead { position: sticky; top: 0; z-index: 1; }
+    .search-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .search-bar .form-input { flex: 1; min-width: 160px; }
+    .template-info { background: #f0f7f2; border: 1px solid #a8d5bc; border-radius: var(--radius-sm); padding: 14px 16px; font-size: 0.875rem; color: #1a5c3a; line-height: 1.7; }
+    .template-info strong { display: block; margin-bottom: 6px; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tag { background: #d4eddf; color: #15703a; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 500; transition: transform 0.15s; }
+    .tag:hover { transform: scale(1.05); }
+    .tag.tag-accent { background: #fff3cd; color: #856404; }
+    .stats-bar { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stats-bar-item {
+      background: #fff; border-radius: 12px; padding: 16px 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center;
+      border: 1px solid rgba(200,223,209,0.3);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stats-bar-item:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+    .stats-bar-item .n { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
+    .stats-bar-item .l { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+    select.form-input { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 20px; padding-right: 40px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: none; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px); }
+    .modal-overlay.show { display: flex; }
+    .modal { background: #fff; border-radius: var(--radius); padding: 32px; max-width: 480px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,0.25); animation: fadeInUp 0.3s ease-out; }
+    .modal h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+    .empty-state { text-align: center; padding: 56px 24px; color: var(--text-muted); }
+    .empty-state svg { width: 56px; height: 56px; opacity: 0.3; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.95rem; }
+    .row { display: flex; gap: 14px; flex-wrap: wrap; }
+    .row .form-group { flex: 1; min-width: 140px; }
+    .tooltip-wrap { position: relative; display: inline-block; }
+    .tooltip-wrap:hover .tooltip { opacity: 1; pointer-events: all; }
+    .tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #0f2a1a; color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 0.78rem; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } .student-stats { display: none; } }
+    .scroll-top {
+      position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px; border-radius: 50%;
+      background: var(--primary); color: #fff; display: none; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 16px rgba(26,92,58,0.4); z-index: 50;
+      transition: all 0.3s; border: none;
+    }
+    .scroll-top:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(26,92,58,0.5); }
+    .scroll-top.show { display: flex; }
+
+    .scroll-hint { text-align: center; font-size: 0.78rem; color: var(--text-muted); padding: 8px 0 2px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .scroll-hint svg { animation: float 2s ease-in-out infinite; }
+    .scroll-hint.hidden { display: none; }
+
+    .school-motto {
+      text-align: center; padding: 12px 16px; margin-top: 16px;
+      font-size: 1.05rem; font-weight: 600; color: var(--primary-dark);
+      letter-spacing: 0.15em; font-style: italic;
+      position: relative;
+    }
+    .school-motto::before, .school-motto::after {
+      content: ''; display: inline-block; width: 40px; height: 1px;
+      background: var(--primary-light); vertical-align: middle; margin: 0 14px;
+    }
+    .contact-notice {
+      text-align: center; padding: 14px 16px; margin-top: 12px;
+      font-size: 0.9rem; color: var(--danger); font-weight: 500;
+      background: #fef2f2; border-radius: var(--radius-sm);
+      border: 1px solid #fecaca;
+    }
+
+    /* ===== FOOTER ===== */
+    .footer {
+      text-align: center; padding: 24px 16px; color: var(--text-muted);
+      font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 40px;
+    }
+    .footer a { color: var(--primary); text-decoration: none; }
+
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #c8dfd1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a0bca8; }
+
+    /* ===== LOADING SKELETON ===== */
+    .skeleton {
+      background: linear-gradient(90deg, #eef2ef 25%, #f8fafc 50%, #eef2ef 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .navbar { padding: 0 16px; }
+      .navbar-brand { font-size: 0.92rem; }
+      .navbar-brand img.logo { width: 34px; height: 34px; }
+      .nav-tab { padding: 7px 12px; font-size: 0.82rem; }
+      .hero { padding: 48px 16px 72px; }
+      .hero h1 { font-size: 1.3rem; }
+      .query-section { margin-top: -32px; }
+      .card { padding: 24px 20px; }
+      .results-section { padding: 20px 12px 40px; }
+      .student-header { padding: 20px 18px; gap: 14px; flex-wrap: wrap; }
+      .student-avatar { width: 48px; height: 48px; font-size: 1.2rem; }
+      .student-info h2 { font-size: 1.1rem; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .summary-card { padding: 14px 12px; }
+      .summary-card .value { font-size: 1.2rem; }
+      .tab-btn { padding: 7px 12px; font-size: 0.8rem; }
+      .admin-wrap { padding: 20px 12px 40px; }
+      .section-card { padding: 18px 14px; }
+      .upload-zone { padding: 24px 16px; }
+      th, td { padding: 7px 8px; font-size: 0.75rem; }
+      .school-motto { font-size: 0.9rem; }
+      .school-motto::before, .school-motto::after { width: 24px; margin: 0 8px; }
+      .contact-notice { font-size: 0.8rem; padding: 10px 12px; }
+    }
+    @media (max-width: 480px) {
+      .navbar { height: 56px; }
+      .navbar-brand span { display: none; }
+      .hero { padding: 36px 14px 60px; }
+      .hero h1 { font-size: 1.15rem; }
+      .summary-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .btn-full { padding: 11px 20px; font-size: 0.9rem; }
+      .search-bar { flex-direction: column; }
+      .search-bar .form-input { min-width: 100%; }
+      .stats-bar { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <img class="logo" src="data:image/png;base64,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" alt="新安中学校徽" />
+    新安中学2023级高三学生往年成绩查询系统
+  </div>
+  <div class="navbar-tabs">
+    <button class="nav-tab active" onclick="switchPage('home')">家长查询</button>
+    <button class="nav-tab" onclick="switchPage('admin')">教师后台</button>
+  </div>
+</nav>
+
+<!-- ===== HOME PAGE ===== -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <h1>新安中学2023级高三学生往年成绩查询系统</h1>
+    <p>安全查询高中三年全科考试成绩，了解学生学习情况与成长轨迹</p>
+    <div class="school-motto" style="margin-top:18px; color:rgba(255,255,255,0.9); font-size:0.95rem; position:relative; z-index:1;">
+      博学笃志，明礼诚信
+    </div>
+  </div>
+  <div class="query-section">
+    <div class="card">
+      <div class="card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        成绩查询
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="q-idcard">学生身份证号码 <span style="color:var(--danger)">*</span></label>
+        <input class="form-input" id="q-idcard" type="text" maxlength="18" placeholder="请输入18位身份证号码（如未录入可不填）" autocomplete="off" />
+        <div class="error-msg" id="err-idcard">请输入正确的18位身份证号码</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="q-name">学生姓名 <span style="color:var(--danger)">*</span></label>
+        <input class="form-input" id="q-name" type="text" placeholder="请输入学生真实姓名" autocomplete="off" />
+        <div class="error-msg" id="err-name">请输入学生姓名</div>
+      </div>
+      <div id="query-alert" class="alert alert-error" style="margin-top:4px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="query-alert-msg"></span>
+      </div>
+      <button class="btn btn-primary btn-full" style="margin-top:8px;" onclick="doQuery()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        查询成绩
+      </button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results-wrap" style="display:none;">
+    <div class="results-section">
+
+      <!-- Student header -->
+      <div class="student-header" id="student-header">
+        <div class="student-avatar" id="stu-avatar"></div>
+        <div class="student-info">
+          <h2 id="stu-name-display"></h2>
+          <p id="stu-meta"></p>
+        </div>
+        <div class="student-stats" id="stu-stats"></div>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="summary-grid" id="summary-cards"></div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab(this,'tab-all')">全部成绩</button>
+        <button class="tab-btn" onclick="switchTab(this,'tab-y1')">高一</button>
+        <button class="tab-btn" onclick="switchTab(this,'tab-y2')">高二</button>
+        <button class="tab-btn" onclick="switchTab(this,'tab-y3')">高三</button>
+        <button class="tab-btn" onclick="switchTab(this,'tab-chart')">成绩趋势</button>
+        <button class="tab-btn" onclick="switchTab(this,'tab-rank')">科目分析</button>
+      </div>
+
+      <div id="tab-all" class="tab-panel active">
+        <div class="card" style="padding:0;position:relative;">
+          <div class="table-wrap" id="table-all"></div>
+        </div>
+      </div>
+      <div id="tab-y1" class="tab-panel">
+        <div class="card" style="padding:0;position:relative;"><div class="table-wrap" id="table-y1"></div></div>
+      </div>
+      <div id="tab-y2" class="tab-panel">
+        <div class="card" style="padding:0;position:relative;"><div class="table-wrap" id="table-y2"></div></div>
+      </div>
+      <div id="tab-y3" class="tab-panel">
+        <div class="card" style="padding:0;position:relative;"><div class="table-wrap" id="table-y3"></div></div>
+      </div>
+      <div id="tab-chart" class="tab-panel">
+        <div class="charts-grid">
+          <div class="chart-card" style="grid-column:1/-1;">
+            <div class="chart-title">三年总分年级排名变化趋势</div>
+            <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">各科平均分对比</div>
+            <div class="chart-wrap"><canvas id="chart-subject"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">总分年级排名分布</div>
+            <div class="chart-wrap"><canvas id="chart-dist"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div id="tab-rank" class="tab-panel">
+        <div class="card">
+          <div id="rank-analysis"></div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:28px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="exportStudentReport()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出成绩单
+        </button>
+        <button class="btn btn-secondary" onclick="backToQuery()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5m7-7-7 7 7 7"/></svg>
+          重新查询
+        </button>
+      </div>
+      <div class="school-motto">博学笃志，明礼诚信</div>
+      <div class="contact-notice">
+        如对成绩有疑问，请咨询班主任
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <p>新安中学2023级成绩查询系统 &copy; 2026 &nbsp;|&nbsp; 数据仅存储在本地浏览器，安全保密</p>
+</div>
+
+<!-- ===== ADMIN PAGE ===== -->
+<div id="page-admin" class="page admin-page">
+
+  <!-- LOGIN -->
+  <div id="admin-login-wrap" class="admin-login">
+    <div class="card">
+      <div class="card-title" style="font-size:1.25rem; justify-content:center; margin-bottom:28px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        教师后台登录
+      </div>
+      <div class="form-group">
+        <label class="form-label">账号</label>
+        <input class="form-input" id="admin-user" type="text" placeholder="输入教师账号" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码</label>
+        <input class="form-input" id="admin-pass" type="password" placeholder="输入密码" />
+      </div>
+      <div id="login-alert" class="alert alert-error" style="margin-top:4px;"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:8px;" onclick="doLogin()">登录</button>
+
+    </div>
+  </div>
+
+  <!-- ADMIN DASHBOARD -->
+  <div id="admin-dash" style="display:none;" class="admin-wrap">
+    <div class="admin-header">
+      <div>
+        <h2>成绩管理后台</h2>
+        <p style="color:var(--text-muted);font-size:0.875rem;margin-top:4px;">导入、查看和管理学生成绩数据</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          下载模板
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="doLogout()">退出登录</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar" id="admin-stats-bar"></div>
+
+    <!-- Student roster management -->
+    <div class="section-card">
+      <h3>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        学生名册管理
+      </h3>
+      <div class="template-info" style="margin-bottom:16px;">
+        <strong>首次使用请先导入学生名册</strong>
+        上传包含学生信息的 Excel/CSV 文件，后续导入成绩时系统将自动匹配，无需再填写身份证号。
+        <div class="tag-list">
+          <span class="tag">姓名</span><span class="tag">身份证号</span><span class="tag">班级</span>
+        </div>
+      </div>
+      <div class="upload-zone" id="roster-zone" onclick="document.getElementById('roster-file-input').click()" style="padding:24px 16px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p>拖放名册文件到此处，或 <span>点击选择文件</span></p>
+        <p style="font-size:0.78rem;margin-top:4px;color:#3d5a47;">支持 .xlsx / .xls / .csv 格式，需包含姓名、身份证号、班级列</p>
+      </div>
+      <input type="file" id="roster-file-input" accept=".xlsx,.xls,.csv" onchange="handleRosterUpload(this)" style="display:none;" />
+      <div id="roster-preview" style="display:none;margin-top:16px;">
+        <div id="roster-alert" class="alert alert-info show" style="margin-bottom:10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="roster-alert-msg"></span>
+        </div>
+        <div class="table-wrap" id="roster-table-wrap" style="max-height:220px;overflow:auto;"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn btn-success" id="confirm-roster-btn" onclick="confirmRosterImport()" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            确认导入名册
+          </button>
+          <button class="btn btn-secondary" onclick="cancelRosterImport()">取消</button>
+        </div>
+      </div>
+      <div id="roster-stats" style="display:none;margin-top:14px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <span class="badge badge-green" id="roster-count-badge"></span>
+          <span class="badge badge-amber" id="roster-missing-badge" style="display:none;">部分学生缺少身份证号</span>
+          <button class="btn btn-secondary btn-sm" onclick="viewRoster()">查看名册</button>
+          <button class="btn btn-success btn-sm" id="btn-supply-idcard" onclick="openIdcardSupply()" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            补录身份证号
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="clearRoster()">清空名册</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import section -->
+    <div class="section-card">
+      <h3>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        导入成绩数据
+      </h3>
+      <div class="template-info" style="margin-bottom:16px;">
+        <strong>成绩单导入格式说明</strong>
+        系统将根据"姓名"自动匹配名册中的学生信息（身份证号、班级），无需在成绩单中填写身份证号。
+        成绩单第一行为科目名，第二行为"得分"、"年级排名"等子标题（如成绩单模板），系统会自动识别。
+        <div class="tag-list">
+          <span class="tag tag-accent">姓名</span><span class="tag">班级</span>
+          <span class="tag">学年</span><span class="tag">考试名称</span>
+          <span class="tag">语文</span><span class="tag">数学</span><span class="tag">英语</span>
+          <span class="tag">物理</span><span class="tag">化学</span><span class="tag">生物</span>
+          <span class="tag">历史</span><span class="tag">地理</span><span class="tag">政治</span>
+          <span class="tag tag-accent">总分</span><span class="tag tag-accent">总分年级排名</span>
+          <span class="tag tag-accent">各科年级排名</span>
+        </div>
+      </div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p>拖放文件到此处，或 <span>点击选择文件</span></p>
+        <p style="font-size:0.78rem;margin-top:6px;color:#3d5a47;">支持 .xlsx / .xls / .csv 格式</p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(this)" />
+      <div id="import-preview" class="import-preview" style="display:none;">
+        <div id="import-alert" class="alert alert-info show" style="margin-bottom:12px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="import-alert-msg"></span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="import-progress" style="width:0"></div></div>
+        <div class="table-wrap" id="import-table-wrap" style="max-height:220px;overflow:auto;margin-top:12px;"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn btn-success" id="confirm-import-btn" onclick="confirmImport()" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            确认导入
+          </button>
+          <button class="btn btn-secondary" onclick="cancelImport()">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual add -->
+    <div class="section-card">
+      <h3>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        手动添加成绩
+      </h3>
+      <div class="row">
+        <div class="form-group"><label class="form-label">选择学生</label><select class="form-input" id="m-student-select"><option value="">-- 请先在名册中添加学生 --</option></select></div>
+      </div>
+      <div class="row" id="m-student-info" style="display:none;">
+        <div class="form-group"><label class="form-label">身份证号</label><input class="form-input" id="m-idcard" readonly style="background:#f1f5f9;" /></div>
+        <div class="form-group"><label class="form-label">班级</label><input class="form-input" id="m-class" readonly style="background:#f1f5f9;" /></div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label class="form-label">学年</label>
+          <select class="form-input" id="m-year">
+            <option value="高一上学期">高一上学期</option>
+            <option value="高一下学期">高一下学期</option>
+            <option value="高二上学期">高二上学期</option>
+            <option value="高二下学期">高二下学期</option>
+            <option value="高三上学期">高三上学期</option>
+            <option value="高三下学期">高三下学期</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">考试名称</label><input class="form-input" id="m-exam" placeholder="如：期中考试" /></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px;">
+        <div class="form-group" style="margin:0;"><label class="form-label">语文</label><input class="form-input" id="s-chinese" type="number" min="0" max="150" placeholder="0-150"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">数学</label><input class="form-input" id="s-math" type="number" min="0" max="150" placeholder="0-150"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">英语</label><input class="form-input" id="s-english" type="number" min="0" max="150" placeholder="0-150"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">物理</label><input class="form-input" id="s-physics" type="number" min="0" max="100" placeholder="0-100"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">化学</label><input class="form-input" id="s-chemistry" type="number" min="0" max="100" placeholder="0-100"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">生物</label><input class="form-input" id="s-biology" type="number" min="0" max="100" placeholder="0-100"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">历史</label><input class="form-input" id="s-history" type="number" min="0" max="100" placeholder="0-100"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">地理</label><input class="form-input" id="s-geography" type="number" min="0" max="100" placeholder="0-100"/></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">政治</label><input class="form-input" id="s-politics" type="number" min="0" max="100" placeholder="0-100"/></div>
+      </div>
+      <div id="manual-alert" class="alert" style="margin-bottom:10px;"></div>
+      <button class="btn btn-primary" onclick="addManualRecord()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        保存成绩
+      </button>
+    </div>
+
+    <!-- Data management -->
+    <div class="section-card">
+      <h3>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        成绩数据管理
+      </h3>
+      <div class="search-bar">
+        <input class="form-input" id="admin-search" placeholder="搜索学生姓名或身份证..." oninput="renderAdminTable()" />
+        <select class="form-input" id="filter-year" style="max-width:150px;" onchange="renderAdminTable()">
+          <option value="">全部学年</option>
+          <option value="高一上学期">高一上学期</option>
+          <option value="高一下学期">高一下学期</option>
+          <option value="高二上学期">高二上学期</option>
+          <option value="高二下学期">高二下学期</option>
+          <option value="高三上学期">高三上学期</option>
+          <option value="高三下学期">高三下学期</option>
+        </select>
+        <button class="btn btn-danger btn-sm" onclick="clearAllData()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6m4-6v6"/><path d="M9 6V4h6v2"/></svg>
+          清空数据
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="exportData()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出数据
+        </button>
+      </div>
+      <div class="data-table-wrap">
+        <div id="admin-table-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <h3 id="modal-title">确认操作</h3>
+    <p id="modal-body" style="color:var(--text-muted);line-height:1.6;"></p>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" id="modal-confirm-btn">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ID card supply modal -->
+<div class="modal-overlay" id="idcard-modal">
+  <div class="modal" style="max-width:560px;">
+    <h3>补录身份证号码</h3>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;">以下学生缺少身份证号码，请逐个填写。补录后家长即可使用身份证号+姓名查询成绩。</p>
+    <div id="idcard-supply-list" style="max-height:360px;overflow-y:auto;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeIdcardModal()">取消</button>
+      <button class="btn btn-success" onclick="saveIdcardSupply()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        保存
+      </button>
+    </div>
+  </div>
+</div>
+
+<button class="scroll-top" id="scroll-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
+<script>
+(function(){
+  var el = document.getElementById('js-test-result');
+  if (!el) return;
+  var msgs = [];
+  try { msgs.push('DOM OK'); } catch(e) { msgs.push('DOM FAIL: '+e.message); }
+  try {
+    if (typeof Chart !== 'undefined') msgs.push('Chart OK');
+    else msgs.push('Chart: NOT LOADED');
+  } catch(e) { msgs.push('Chart FAIL: '+e.message); }
+  try {
+    if (typeof XLSX !== 'undefined') msgs.push('XLSX OK');
+    else msgs.push('XLSX: NOT LOADED');
+  } catch(e) { msgs.push('XLSX FAIL: '+e.message); }
+  el.textContent = msgs.join(' | ');
+  el.style.background = '#d4edda';
+  el.style.color = '#155724';
+})();
+// ===================== DATA STORE =====================
+const STORE_KEY = 'score_system_v1';
+const ROSTER_KEY = 'score_system_roster';
+const ADMIN_CREDS = { username: 'admin', password: '123456' };
+const SUBJECTS = ['语文','数学','英语','物理','化学','生物','历史','地理','政治'];
+const SUBJECT_KEYS = ['chinese','math','english','physics','chemistry','biology','history','geography','politics'];
+const YEAR_ORDER = {'高一上学期':1,'高一下学期':2,'高二上学期':3,'高二下学期':4,'高三上学期':5,'高三下学期':6};
+
+// Exam ordering within a semester: {year -> [regex, order]} or direct examName -> order
+// Order by semester + examName together
+const SEMESTER_EXAM_ORDER = {
+  '高二下学期': { '期中考试': 1, '期末考试': 2 },
+  '高三上学期': { '八月联考': 1, '宝安区一模': 2, '十二月联考': 3, '期末考试': 4 },
+  '高三下学期': { '模拟考试一': 1, '模拟考试二': 2, '模拟考试三': 3, '期末考试': 4, '一模': 1, '二模': 2, '三模': 3 }
+};
+// Fallback order for unrecognized exam names
+const DEFAULT_EXAM_ORDER = { '期中考试': 10, '期末考试': 20, '月考一': 1, '月考二': 2, '月考三': 3 };
+function getExamOrder(examName, year) {
+  if (!examName) return 50;
+  const e = examName.trim();
+  // Check semester-specific order first
+  const semOrders = SEMESTER_EXAM_ORDER[year];
+  if (semOrders) {
+    // Exact match
+    if (semOrders[e] !== undefined) return semOrders[e];
+    // Partial match
+    for (const [key, order] of Object.entries(semOrders)) {
+      if (e.includes(key)) return order;
+    }
+  }
+  // Fallback to default
+  if (DEFAULT_EXAM_ORDER[e] !== undefined) return DEFAULT_EXAM_ORDER[e];
+  for (const [key, order] of Object.entries(DEFAULT_EXAM_ORDER)) {
+    if (e.includes(key)) return order;
+  }
+  return 50;
+}
+function getYearOrder(year) {
+  return YEAR_ORDER[year] || 99;
+}
+function getSortOrder(record) {
+  if (record.sortOrder) return record.sortOrder;
+  return getYearOrder(record.year) * 100 + getExamOrder(record.examName, record.year);
+}
+
+const _storageAvailable = (function() {
+  try { const k = '__test__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; }
+  catch(e) { return false; }
+})();
+const _memStore = {}; // 内存后备存储（file:// 协议下 localStorage 不可用时使用）
+
+// ===================== 部署版：从外部 JSON 加载数据 =====================
+// 每次都从 score_data.json 和 score_roster.json 加载最新数据，确保家长看到最新成绩
+const _DATA_INIT_PROMISE = Promise.all([
+  fetch('score_data.json?t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data; data.length > 0) {
+        _memStore[STORE_KEY] = data;
+        try { if (_storageAvailable) localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        console.log('已从 score_data.json 加载 ' + data.length + ' 条成绩数据');
+      }
+    })
+    .catch(function() { console.log('score_data.json 未找到或加载失败'); }),
+  fetch('score_roster.json?t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data; data.length > 0) {
+        _memStore[ROSTER_KEY] = data;
+        try { if (_storageAvailable) localStorage.setItem(ROSTER_KEY, JSON.stringify(data)); } catch(e) {}
+        console.log('已从 score_roster.json 加载 ' + data.length + ' 名学生名册');
+      }
+    })
+    .catch(function() { console.log('score_roster.json 未找到或加载失败'); })
+]);
+// ===================== END 部署版 =====================
+function loadData() {
+  try { return _storageAvailable ? (JSON.parse(localStorage.getItem(STORE_KEY)) || []) : (_memStore[STORE_KEY] || []); } catch(e) { return _memStore[STORE_KEY] || []; }
+}
+function saveData(records) {
+  try {
+    if (_storageAvailable) localStorage.setItem(STORE_KEY, JSON.stringify(records));
+    _memStore[STORE_KEY] = records;
+  } catch(e) { _memStore[STORE_KEY] = records; console.warn('saveData:', e); }
+}
+function loadRoster() {
+  try { return _storageAvailable ? (JSON.parse(localStorage.getItem(ROSTER_KEY)) || []) : (_memStore[ROSTER_KEY] || []); } catch(e) { return _memStore[ROSTER_KEY] || []; }
+}
+function saveRoster(roster) {
+  try {
+    if (_storageAvailable) localStorage.setItem(ROSTER_KEY, JSON.stringify(roster));
+    _memStore[ROSTER_KEY] = roster;
+  } catch(e) { _memStore[ROSTER_KEY] = roster; console.warn('saveRoster:', e); }
+}
+function findStudentInRoster(name) {
+  const roster = loadRoster();
+  return roster.find(s => s.name === name) || null;
+}
+
+
+// ===================== UTILS =====================
+function getTotal(scores) {
+  return Object.values(scores).reduce((a,b) => a + (Number(b)||0), 0);
+}
+function getLevel(score, max) {
+  const pct = score / max;
+  if (pct >= 0.9) return 'A';
+  if (pct >= 0.75) return 'B';
+  if (pct >= 0.6) return 'C';
+  return 'D';
+}
+function scoreBadge(score, max) {
+  const lv = getLevel(score, max);
+  return `<span class="score-badge score-${lv.toLowerCase()}">${score}</span>`;
+}
+function validateIdCard(id) {
+  return /^\d{17}[\dX]$/i.test(id.trim());
+}
+
+// ===================== PAGE SWITCH =====================
+let isLoggedIn = false;
+function switchPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  document.querySelectorAll('.nav-tab')[p === 'home' ? 0 : 1].classList.add('active');
+  if (p === 'admin') {
+    if (isLoggedIn) { showAdminDash(); }
+    else { document.getElementById('admin-login-wrap').style.display = ''; document.getElementById('admin-dash').style.display = 'none'; }
+  }
+  window.scrollTo(0, 0);
+}
+
+// ===================== TAB SWITCH =====================
+let trendChart = null, subjectChart = null, distChart = null;
+function switchTab(btn, id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(id).classList.add('active');
+  if (id === 'tab-chart') setTimeout(renderCharts, 50);
+  if (id === 'tab-rank') renderRankAnalysis();
+}
+
+// ===================== QUERY =====================
+function doQuery() {
+  // 部署版：等待外部数据加载完成
+  if (typeof _DATA_INIT_PROMISE !== 'undefined' && _DATA_INIT_PROMISE) {
+    _DATA_INIT_PROMISE.then(function() { doQueryInner(); });
+  } else {
+    doQueryInner();
+  }
+}
+function doQueryInner() {
+  const idcard = document.getElementById('q-idcard').value.trim();
+  const name = document.getElementById('q-name').value.trim();
+  let valid = true;
+  document.getElementById('err-idcard').classList.remove('show');
+  document.getElementById('err-name').classList.remove('show');
+  setQueryAlert('', false);
+  if (idcard && !validateIdCard(idcard)) { document.getElementById('err-idcard').classList.add('show'); valid = false; }
+  if (!name) { document.getElementById('err-name').classList.add('show'); valid = false; }
+  if (!valid) return;
+  // Match: trim both name and idcard, case-insensitive for idcard, allow slight whitespace differences for name
+  const qName = name.replace(/\s+/g, '');
+  const qIdcard = idcard.toUpperCase();
+  const records = loadData().filter(r => {
+    const rIdcard = (r.idcard || '').toUpperCase();
+    const rName = (r.name || '').replace(/\s+/g, '');
+    // If student has idcard, match by both idcard and name
+    if (rIdcard && rIdcard.length >= 17) {
+      return rIdcard === qIdcard && rName === qName;
+    }
+    // If student has no idcard, match by name only
+    return rName === qName;
+  });
+  if (!records.length) { setQueryAlert('信息录入有误，如需查询成绩请联系班主任', true); return; }
+  showResults(records, name, idcard);
+}
+function setQueryAlert(msg, show) {
+  const el = document.getElementById('query-alert');
+  document.getElementById('query-alert-msg').textContent = msg;
+  el.classList.toggle('show', show);
+}
+
+let _currentRecords = [];
+let _currentStudentName = '';
+let _currentStudentIdcard = '';
+function showResults(records, name, idcard) {
+  _currentRecords = records;
+  _currentStudentName = name;
+  _currentStudentIdcard = idcard;
+  document.getElementById('results-wrap').style.display = '';
+  document.querySelector('.query-section').style.display = 'none';
+  document.querySelector('.hero').style.display = 'none';
+
+  // Avatar
+  document.getElementById('stu-avatar').textContent = name.charAt(0);
+
+  // Info
+  const latest = records.sort((a,b) => (b.sortOrder||0) - (a.sortOrder||0))[0];
+  document.getElementById('stu-name-display').textContent = name;
+  const idcardDisplay = idcard ? `${idcard.slice(0,6)}****${idcard.slice(-4)}` : '未录入';
+  document.getElementById('stu-meta').textContent = `班级：${latest.class || '—'}  |  身份证：${idcardDisplay}`;
+
+  // Stats
+  const totals = records.map(r => getTotal(r.scores));
+  const maxTotal = Math.max(...totals);
+  const avgTotal = Math.round(totals.reduce((a,b)=>a+b,0)/totals.length);
+  document.getElementById('stu-stats').innerHTML = `
+    <div class="stat-item"><div class="stat-value">${records.length}</div><div class="stat-label">考试次数</div></div>
+    <div class="stat-item"><div class="stat-value">${maxTotal}</div><div class="stat-label">最高总分</div></div>
+    <div class="stat-item"><div class="stat-value">${avgTotal}</div><div class="stat-label">平均总分</div></div>`;
+
+  // Summary cards
+  const allScores = records.flatMap(r => Object.values(r.scores));
+  const subAvgs = SUBJECT_KEYS.map((k,i) => {
+    const arr = records.map(r => Number(r.scores[k])||0).filter(v => v > 0);
+    return { name: SUBJECTS[i], avg: arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0 };
+  });
+  const best = [...subAvgs].sort((a,b)=>b.avg-a.avg)[0];
+  const worst = [...subAvgs].sort((a,b)=>a.avg-b.avg).find(s=>s.avg>0);
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="summary-card green"><div class="label">最高总分</div><div class="value">${maxTotal}</div><div class="sub">${latest.class}</div></div>
+    <div class="summary-card"><div class="label">考试次数</div><div class="value">${records.length}</div><div class="sub">三年累计</div></div>
+    <div class="summary-card sky"><div class="label">平均总分</div><div class="value">${avgTotal}</div><div class="sub">所有考试</div></div>
+    <div class="summary-card amber"><div class="label">最强科目</div><div class="value" style="font-size:1.1rem">${best.name}</div><div class="sub">均分 ${best.avg}</div></div>
+    ${worst&&worst.name!==best.name?`<div class="summary-card red"><div class="label">待提升科目</div><div class="value" style="font-size:1.1rem">${worst.name}</div><div class="sub">均分 ${worst.avg}</div></div>`:''}`;
+
+  // Tables
+  renderScoreTable('table-all', records);
+  renderScoreTable('table-y1', records.filter(r=>r.year&&r.year.startsWith('高一')));
+  renderScoreTable('table-y2', records.filter(r=>r.year&&r.year.startsWith('高二')));
+  renderScoreTable('table-y3', records.filter(r=>r.year&&r.year.startsWith('高三')));
+
+  // Default first tab
+  document.querySelectorAll('.tab-btn')[0].click();
+  document.getElementById('results-wrap').scrollIntoView({behavior:'smooth'});
+}
+
+function renderScoreTable(containerId, records) {
+  const sorted = [...records].sort((a,b) => getSortOrder(a) - getSortOrder(b));
+  if (!sorted.length) {
+    document.getElementById(containerId).innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg><p>暂无该学年成绩记录</p></div>';
+    return;
+  }
+  const maxes = {chinese:150,math:150,english:150,physics:100,chemistry:100,biology:100,history:100,geography:100,politics:100};
+  // Check if any record has subject-level ranks
+  const hasSubjectRanks = sorted.some(r => r.ranks && SUBJECT_KEYS.some(k => r.ranks[k]));
+  // Build header
+  const thScoreRow = `<th>学年</th><th>考试名称</th>${SUBJECTS.map(s=>`<th>${s}</th>`).join('')}<th>总分</th>`;
+  const thRankRow = hasSubjectRanks
+    ? `<th rowspan="2">总分<br>排名</th>${SUBJECTS.map(s=>`<th>${s}<br>排名</th>`).join('')}`
+    : `<th rowspan="2">总分排名</th>`;
+  let html = hasSubjectRanks
+    ? `<table><thead><tr>${thScoreRow}</tr><tr><th colspan="2" style="background:rgba(0,0,0,0.05);"></th>${SUBJECTS.map(()=>`<th style="background:rgba(0,0,0,0.05);padding:6px 8px;font-size:0.72rem;">得分</th>`).join('')}<th style="background:rgba(0,0,0,0.05);padding:6px 8px;font-size:0.72rem;">合计</th>${thRankRow}</tr></thead><tbody>`
+    : `<table><thead><tr>${thScoreRow}<th>总分排名</th></tr></thead><tbody>`;
+  sorted.forEach(r => {
+    const total = getTotal(r.scores);
+    const rk = r.ranks || {};
+    const rankTotal = rk.total ? `<span class="rank-tag">${rk.total}</span>` : '—';
+    html += `<tr><td><span class="badge badge-blue">${r.year}</span></td><td>${r.examName}</td>
+      ${SUBJECT_KEYS.map(k => `<td>${scoreBadge(r.scores[k]||0, maxes[k])}</td>`).join('')}
+      <td><strong>${total}</strong></td>`;
+    if (hasSubjectRanks) {
+      html += `<td>${rankTotal}</td>`;
+      html += SUBJECT_KEYS.map(k => {
+        const rv = rk[k];
+        return rv ? `<td><span class="rank-sub">${rv}</span></td>` : '<td>—</td>';
+      }).join('');
+    } else {
+      html += `<td>${rankTotal}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  const container = document.getElementById(containerId);
+  container.innerHTML = html;
+  // Add scroll hint if table is wider than container
+  requestAnimationFrame(() => {
+    const table = container.querySelector('table');
+    const card = container.parentElement;
+    if (table && table.scrollWidth > container.clientWidth) {
+      container.classList.remove('no-scroll');
+      if (!card.querySelector('.scroll-hint')) {
+        const hint = document.createElement('div');
+        hint.className = 'scroll-hint';
+        hint.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>左右滑动查看更多';
+        card.appendChild(hint);
+      }
+    } else {
+      container.classList.add('no-scroll');
+      const existing = card.querySelector('.scroll-hint');
+      if (existing) existing.remove();
+    }
+  });
+}
+
+function backToQuery() {
+  document.getElementById('results-wrap').style.display = 'none';
+  document.querySelector('.query-section').style.display = '';
+  document.querySelector('.hero').style.display = '';
+  destroyCharts();
+  window.scrollTo(0,0);
+}
+
+// ===================== CHARTS =====================
+function destroyCharts() {
+  [trendChart, subjectChart, distChart].forEach(c => { if (c) c.destroy(); });
+  trendChart = subjectChart = distChart = null;
+}
+function renderCharts() {
+  if (typeof Chart === 'undefined') return; // Chart.js 未加载时跳过
+  destroyCharts();
+  const records = [..._currentRecords].sort((a,b) => getSortOrder(a) - getSortOrder(b));
+  const labels = records.map(r => `${r.year}·${r.examName.replace('考试','')}`);
+  const totals = records.map(r => getTotal(r.scores));
+
+  // Trend - show total rank trend
+  const rankData = records.map(r => (r.ranks && r.ranks.total) ? r.ranks.total : null);
+  const hasRankData = rankData.some(v => v !== null);
+  const trendLabels = hasRankData ? labels : labels;
+
+  const ctx1 = document.getElementById('chart-trend').getContext('2d');
+  const gradient = ctx1.createLinearGradient(0, 0, 0, 280);
+  if (hasRankData) {
+    // For rank chart: lower is better, so invert gradient direction
+    gradient.addColorStop(0, 'rgba(46,139,87,0.02)');
+    gradient.addColorStop(1, 'rgba(46,139,87,0.25)');
+  } else {
+    gradient.addColorStop(0, 'rgba(46,139,87,0.25)');
+    gradient.addColorStop(1, 'rgba(46,139,87,0.02)');
+  }
+  const trendDataset = hasRankData
+    ? {
+        label: '总分年级排名', data: rankData, borderColor: '#2e8b57', backgroundColor: gradient,
+        fill: true, tension: 0.4, pointBackgroundColor: '#1a5c3a', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 8, borderWidth: 3,
+        spanGaps: true
+      }
+    : {
+        label: '总分', data: totals, borderColor: '#2e8b57', backgroundColor: gradient,
+        fill: true, tension: 0.4, pointBackgroundColor: '#1a5c3a', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 8, borderWidth: 3
+      };
+  trendChart = new Chart(ctx1, {
+    type: 'line',
+    data: { labels: trendLabels, datasets: [trendDataset] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: hasRankData, labels: { font: { size: 12 } } },
+        tooltip: { backgroundColor: '#0f3d26', titleFont: { size: 13 }, bodyFont: { size: 12 }, padding: 12, cornerRadius: 8,
+          callbacks: hasRankData ? {
+            label: function(ctx) {
+              return ctx.raw !== null ? `总分年级排名：第 ${ctx.raw} 名` : '暂无排名数据';
+            }
+          } : undefined
+        }
+      },
+      scales: {
+        y: {
+          reverse: hasRankData,
+          beginAtZero: !hasRankData,
+          title: hasRankData ? { display: true, text: '年级排名（越靠上越好）', font: { size: 11 } } : {},
+          grid: { color: '#f0f4f2' }, ticks: { font: { size: 11 }, stepSize: hasRankData ? undefined : undefined }
+        },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Subject averages
+  const ctx2 = document.getElementById('chart-subject').getContext('2d');
+  const subAvgs = SUBJECT_KEYS.map(k => {
+    const arr = records.map(r => Number(r.scores[k])||0).filter(v=>v>0);
+    return arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
+  });
+  subjectChart = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: SUBJECTS,
+      datasets: [{ label: '平均分', data: subAvgs, backgroundColor: ['#1a5c3a','#2e8b57','#3aaa6e','#10b981','#059669','#047857','#065f46','#064e3b','#022c22'], borderRadius: 6, borderSkipped: false }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f3d26', cornerRadius: 8, padding: 12 } }, scales: { y: { beginAtZero: true, grid: { color: '#f0f4f2' }, ticks: { font: { size: 11 } } }, x: { grid: { display: false }, ticks: { font: { size: 11 } } } } }
+  });
+
+  // Rank distribution chart
+  const ctx3 = document.getElementById('chart-dist').getContext('2d');
+  const rankDistData = records.map(r => (r.ranks && r.ranks.total) ? r.ranks.total : null).filter(v => v !== null);
+  const hasRank = rankDistData.length > 0;
+
+  let distChart;
+  if (hasRank) {
+    // Build rank distribution: bar chart showing rank per exam
+    const minRank = Math.min(...rankDistData);
+    const maxRank = Math.max(...rankDistData);
+    // Color bars: green for best ranks, yellow for mid, red for worse
+    const barColors = rankDistData.map(r => {
+      if (r <= minRank + (maxRank - minRank) * 0.33) return '#10b981';
+      if (r <= minRank + (maxRank - minRank) * 0.66) return '#f59e0b';
+      return '#ef4444';
+    });
+    // Short labels for x-axis (year + short exam name)
+    const rankLabels = records
+      .map(r => {
+        if (!r.ranks || !r.ranks.total) return null;
+        // Shorten exam name for display
+        let short = r.examName || '';
+        if (short.length > 5) short = short.slice(0, 4) + '…';
+        return (r.year || '').replace('学期', '') + '\n' + short;
+      })
+      .filter(l => l !== null);
+
+    distChart = new Chart(ctx3, {
+      type: 'bar',
+      data: {
+        labels: rankLabels,
+        datasets: [{
+          label: '总分年级排名',
+          data: rankDistData,
+          backgroundColor: barColors,
+          borderRadius: 6,
+          borderSkipped: false,
+          maxBarThickness: 50
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f3d26',
+            cornerRadius: 8,
+            padding: 12,
+            callbacks: {
+              title: function(items) {
+                return items[0].label.replace('\n', ' ');
+              },
+              label: function(ctx) {
+                return '总分年级排名：第 ' + ctx.raw + ' 名';
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            reverse: true,
+            beginAtZero: false,
+            title: { display: true, text: '排名（越低越好）', font: { size: 11 } },
+            grid: { color: '#f0f4f2' },
+            ticks: { font: { size: 11 } }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 0 }
+          }
+        }
+      }
+    });
+  } else {
+    // No rank data available - show message
+    distChart = new Chart(ctx3, {
+      type: 'bar',
+      data: { labels: ['暂无排名数据'], datasets: [{ data: [0], backgroundColor: '#e5e7eb' }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { y: { display: false }, x: { ticks: { font: { size: 12 } } } }
+      }
+    });
+  }
+}
+
+function renderRankAnalysis() {
+  const records = _currentRecords;
+  const maxes = {chinese:150,math:150,english:150,physics:100,chemistry:100,biology:100,history:100,geography:100,politics:100};
+  const subAvgs = SUBJECT_KEYS.map((k,i) => {
+    const arr = records.map(r=>Number(r.scores[k])||0).filter(v=>v>0);
+    const avg = arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
+    const pct = avg / maxes[k] * 100;
+    // Get latest rank for this subject
+    const sortedRecs = [...records].sort((a,b) => (b.sortOrder||0) - (a.sortOrder||0));
+    const latestRank = sortedRecs.find(r => r.ranks && r.ranks[k]);
+    const rankVal = latestRank ? latestRank.ranks[k] : null;
+    return { name: SUBJECTS[i], key: SUBJECT_KEYS[i], avg: avg.toFixed(1), pct: pct.toFixed(1), max: Math.max(...arr)||0, min: Math.min(...arr)||0, lv: getLevel(avg, maxes[k]), latestRank: rankVal };
+  });
+  const sorted = [...subAvgs].sort((a,b) => b.pct - a.pct);
+  let html = '<div style="margin-bottom:20px;"><strong style="color:var(--primary);font-size:1.05rem;">各科目综合分析（按得分率排序）</strong>';
+  // Check if any record has ranks
+  const hasAnyRank = subAvgs.some(s => s.latestRank);
+  if (hasAnyRank) {
+    html += '<span style="margin-left:12px;font-size:0.78rem;color:var(--text-muted);">排名数据来自最近一次有排名记录的考试</span>';
+  }
+  html += '</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:12px;">';
+  sorted.forEach((s,i) => {
+    const medal = i===0?'<svg style="width:18px;height:18px;vertical-align:middle;" viewBox="0 0 24 24" fill="#d97706" stroke="none"><circle cx="12" cy="8" r="6"/><path d="M8 14l-2 6h12l-2-6"/></svg>':i===1?'<svg style="width:18px;height:18px;vertical-align:middle;" viewBox="0 0 24 24" fill="#9ca3af" stroke="none"><circle cx="12" cy="8" r="6"/><path d="M8 14l-2 6h12l-2-6"/></svg>':i===2?'<svg style="width:18px;height:18px;vertical-align:middle;" viewBox="0 0 24 24" fill="#b45309" stroke="none"><circle cx="12" cy="8" r="6"/><path d="M8 14l-2 6h12l-2-6"/></svg>':'<svg style="width:18px;height:18px;vertical-align:middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg>';
+    const color = s.lv==='A'?'#10b981':s.lv==='B'?'#2e8b57':s.lv==='C'?'#f59e0b':'#ef4444';
+    html += `<div style="background:#fff;border-radius:12px;padding:16px 18px;border-left:4px solid ${color};box-shadow:0 2px 8px rgba(0,0,0,0.05);transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='translateX(4px)'" onmouseout="this.style.transform='none'">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:600;display:flex;align-items:center;gap:6px;">${medal} ${s.name}</div>
+        <div style="display:flex;gap:12px;font-size:0.82rem;color:var(--text-muted);align-items:center;flex-wrap:wrap;">
+          <span>均分 <strong style="color:var(--text);font-size:0.9rem">${s.avg}</strong></span>
+          <span>最高 <strong style="color:#10b981">${s.max}</strong></span>
+          <span>最低 <strong style="color:#ef4444">${s.min}</strong></span>
+          <span class="score-badge score-${s.lv.toLowerCase()}">${s.lv}级</span>
+          ${s.latestRank ? `<span class="rank-tag" style="font-size:0.78rem;">第${s.latestRank}名</span>` : ''}
+        </div>
+      </div>
+      <div style="background:#eef2ef;border-radius:20px;height:8px;overflow:hidden;">
+        <div style="background:${color};height:100%;border-radius:20px;width:${s.pct}%;transition:width 0.8s cubic-bezier(0.4,0,0.2,1);"></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:5px;display:flex;justify-content:space-between;">
+        <span>得分率 ${s.pct}%</span>
+        <span>${Number(s.pct)>=85?'优秀':Number(s.pct)>=75?'良好':Number(s.pct)>=60?'及格':'需努力'}</span>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('rank-analysis').innerHTML = html;
+}
+
+// ===================== ADMIN =====================
+function doLogin() {
+  const u = document.getElementById('admin-user').value.trim();
+  const p = document.getElementById('admin-pass').value;
+  if (u === ADMIN_CREDS.username && p === ADMIN_CREDS.password) {
+    isLoggedIn = true;
+    showAdminDash();
+  } else {
+    const al = document.getElementById('login-alert');
+    al.textContent = '账号或密码错误，请重试';
+    al.classList.add('show','alert-error');
+  }
+}
+function doLogout() {
+  isLoggedIn = false;
+  document.getElementById('admin-login-wrap').style.display = '';
+  document.getElementById('admin-dash').style.display = 'none';
+}
+function showAdminDash() {
+  document.getElementById('admin-login-wrap').style.display = 'none';
+  document.getElementById('admin-dash').style.display = '';
+  renderAdminStats();
+  renderAdminTable();
+  refreshRosterStatus();
+  refreshStudentSelect();
+}
+function renderAdminStats() {
+  const records = loadData();
+  const students = new Set(records.map(r=>r.idcard)).size;
+  const exams = new Set(records.map(r=>r.examName)).size;
+  const rosterCount = loadRoster().length;
+  document.getElementById('admin-stats-bar').innerHTML = `
+    <div class="stats-bar-item"><div class="n">${rosterCount}</div><div class="l">名册学生</div></div>
+    <div class="stats-bar-item"><div class="n">${records.length}</div><div class="l">成绩记录</div></div>
+    <div class="stats-bar-item"><div class="n">${students}</div><div class="l">有成绩学生</div></div>
+    <div class="stats-bar-item"><div class="n">${exams}</div><div class="l">考试场次</div></div>
+    <div class="stats-bar-item"><div class="n">${records.filter(r=>r.year&&r.year.startsWith('高一')).length}</div><div class="l">高一记录</div></div>
+    <div class="stats-bar-item"><div class="n">${records.filter(r=>r.year&&r.year.startsWith('高二')).length}</div><div class="l">高二记录</div></div>
+    <div class="stats-bar-item"><div class="n">${records.filter(r=>r.year&&r.year.startsWith('高三')).length}</div><div class="l">高三记录</div></div>`;
+}
+function renderAdminTable() {
+  const kw = document.getElementById('admin-search').value.trim().toLowerCase();
+  const yr = document.getElementById('filter-year').value;
+  let records = loadData();
+  if (kw) records = records.filter(r => r.name.includes(kw) || r.idcard.includes(kw));
+  if (yr) records = records.filter(r => r.year === yr);
+  records.sort((a,b) => (b.sortOrder||0) - (a.sortOrder||0) || a.name.localeCompare(b.name));
+  if (!records.length) {
+    document.getElementById('admin-table-container').innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg><p>暂无成绩数据</p></div>';
+    return;
+  }
+  let html = `<table><thead><tr><th>姓名</th><th>班级</th><th>学年</th><th>考试</th><th>语文</th><th>数学</th><th>英语</th><th>总分</th><th>总分排名</th><th>操作</th></tr></thead><tbody>`;
+  records.forEach(r => {
+    const total = getTotal(r.scores);
+    const rankTotal = (r.ranks && r.ranks.total) ? `<span class="rank-tag">第${r.ranks.total}名</span>` : '—';
+    html += `<tr>
+      <td><strong>${r.name}</strong></td><td>${r.class||'—'}</td>
+      <td><span class="badge badge-blue">${r.year}</span></td>
+      <td>${r.examName}</td>
+      <td>${r.scores.chinese||0}</td><td>${r.scores.math||0}</td><td>${r.scores.english||0}</td>
+      <td><strong>${total}</strong></td>
+      <td>${rankTotal}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteRecord('${r.id}')">删除</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('admin-table-container').innerHTML = html;
+}
+function deleteRecord(id) {
+  openModal('确认删除', '确定要删除该条成绩记录吗？此操作不可恢复。', () => {
+    const records = loadData().filter(r => r.id !== id);
+    saveData(records);
+    renderAdminStats();
+    renderAdminTable();
+  });
+}
+function clearAllData() {
+  openModal('清空全部数据', '⚠️ 确定要清空所有成绩数据吗？此操作不可恢复！', () => {
+    saveData([]);
+    renderAdminStats();
+    renderAdminTable();
+  });
+}
+
+// ===================== FILE IMPORT =====================
+let _pendingImport = [];
+
+function handleFileUpload(input) {
+  if (typeof XLSX === 'undefined') { alert('Excel组件未加载，请检查网络连接后刷新页面'); return; }
+  const file = input.files[0];
+  if (!file) return;
+  const roster = loadRoster();
+  if (!roster.length) {
+    setImportAlert('请先导入学生名册（上方"学生名册管理"区域），系统需要名册来匹配成绩单中的学生信息。', 'error');
+    input.value = '';
+    return;
+  }
+  document.getElementById('import-preview').style.display = '';
+  setImportAlert('正在解析文件...', 'info');
+  document.getElementById('import-progress').style.width = '30%';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+      document.getElementById('import-progress').style.width = '50%';
+      // Try to detect multi-row header format (like the grade sheet)
+      const parsed = parseGradeSheet(rawRows, roster);
+      document.getElementById('import-progress').style.width = '100%';
+      if (parsed.errors && parsed.errors.length) {
+        setImportAlert(`解析完成，共 ${parsed.records.length} 条有效记录，${parsed.errors.length} 个姓名未在名册中找到：${parsed.errors.slice(0,10).join('、')}${parsed.errors.length>10?'...':''}`, 'info');
+      } else {
+        setImportAlert(`解析完成，共 ${parsed.records.length} 条有效记录，请确认后导入`, 'info');
+      }
+      _pendingImport = parsed.records;
+      document.getElementById('import-progress').style.width = '100%';
+      renderImportPreview(_pendingImport.slice(0,10));
+      document.getElementById('confirm-import-btn').style.display = _pendingImport.length ? '' : 'none';
+    } catch(err) {
+      setImportAlert('文件解析失败：' + err.message, 'error');
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseGradeSheet(rawRows, roster) {
+  // Build a lookup map from roster: name -> {idcard, class}
+  const rosterMap = {};
+  roster.forEach(s => { rosterMap[s.name] = s; });
+
+  // Detect if this is a multi-row header format (row 0: subject names, row 1: sub-headers like 得分/排名)
+  if (rawRows.length < 3) return { records: [], errors: [] };
+
+  const headerRow0 = rawRows[0].map(c => String(c).trim());
+  const headerRow1 = rawRows[1] ? rawRows[1].map(c => String(c).trim()) : [];
+
+  // Check for multi-row header: look for "得分" or "年级排名" in row 1
+  const isMultiHeader = headerRow1.some(h => h === '得分' || h === '年级排名' || h === '档次');
+
+  // Parse column mapping
+  const colMap = { name: -1, class: -1, year: -1, examName: -1 };
+  const scoreCols = {};
+  const rankCols = {};
+
+  if (isMultiHeader) {
+    // Multi-row header: row 0 has subject names spanning multiple columns
+    // row 1 has: 得分, 年级排名, 档次 for each subject
+    // Special tracking for 总分 since it's not in SUBJECT_KEY_MAP
+    let lastSubject = null;
+    for (let c = 0; c < headerRow0.length; c++) {
+      const h0 = headerRow0[c];
+      const h1 = c < headerRow1.length ? headerRow1[c] : '';
+      if (!h0 && !h1) continue;
+      if (h0 === '姓名') { colMap.name = c; }
+      else if (h0 === '班级') { colMap.class = c; }
+      else if (h0 === '学年') { colMap.year = c; }
+      else if (h0 === '考试名称' || h0 === '考试') { colMap.examName = c; }
+      else if (h0 && h1 === '得分') {
+        lastSubject = h0;
+        if (h0 === '总分') { /* 总分得分列，不映射到科目分数 */ }
+        else {
+          const key = SUBJECT_KEY_MAP[h0];
+          if (key) scoreCols[key] = c;
+        }
+      }
+      else if (h1 === '年级排名') {
+        if (lastSubject === '总分') {
+          rankCols.total = c;
+        } else if (lastSubject) {
+          const key = SUBJECT_KEY_MAP[lastSubject];
+          if (key) rankCols[key] = c;
+        }
+        lastSubject = null;
+      }
+      // Skip 档次 column
+    }
+  } else {
+    // Simple single-row header
+    for (let c = 0; c < headerRow0.length; c++) {
+      const h = headerRow0[c];
+      if (!h) continue;
+      if (h === '姓名') colMap.name = c;
+      else if (h === '班级') colMap.class = c;
+      else if (h === '学年') colMap.year = c;
+      else if (h === '考试名称' || h === '考试') colMap.examName = c;
+      else if (h === '身份证号' || h === '身份证' || h === '身份证号码') { /* skip, not needed */ }
+      else {
+        const key = SUBJECT_KEY_MAP[h];
+        if (key) scoreCols[key] = c;
+        const rKey = RANK_KEY_MAP[h];
+        if (rKey) rankCols[rKey] = c;
+      }
+    }
+  }
+
+  // Parse data rows (skip header rows)
+  const dataStart = isMultiHeader ? 2 : 1;
+  const records = [];
+  const errors = [];
+  const unmatchedNames = new Set();
+
+  for (let i = dataStart; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    if (!row || row.length === 0) continue;
+    const nameIdx = colMap.name;
+    if (nameIdx < 0 || nameIdx >= row.length) continue;
+    const name = String(row[nameIdx]).trim();
+    if (!name) continue;
+
+    // Look up student in roster
+    const student = rosterMap[name];
+    if (!student) {
+      unmatchedNames.add(name);
+      continue;
+    }
+
+    const getScore = (key) => {
+      if (key === 'totalScore') return null;
+      const c = scoreCols[key];
+      if (c === undefined || c >= row.length) return 0;
+      const v = parseFloat(row[c]);
+      return isNaN(v) ? 0 : v;
+    };
+    const getRank = (key) => {
+      const c = rankCols[key];
+      if (c === undefined || c >= row.length) return null;
+      const v = parseInt(row[c]);
+      return isNaN(v) ? null : v;
+    };
+
+    records.push({
+      id: `import_${Date.now()}_${i}`,
+      name: student.name,
+      idcard: student.idcard,
+      class: student.class || (colMap.class >= 0 && colMap.class < row.length ? String(row[colMap.class]).trim() : ''),
+      year: (colMap.year >= 0 && colMap.year < row.length) ? String(row[colMap.year]).trim() : '',
+      examName: (colMap.examName >= 0 && colMap.examName < row.length) ? String(row[colMap.examName]).trim() : '',
+      scores: {
+        chinese: getScore('chinese'), math: getScore('math'), english: getScore('english'),
+        physics: getScore('physics'), chemistry: getScore('chemistry'), biology: getScore('biology'),
+        history: getScore('history'), geography: getScore('geography'), politics: getScore('politics')
+      },
+      ranks: {
+        total: getRank('total'),
+        chinese: getRank('chinese'), math: getRank('math'), english: getRank('english'),
+        physics: getRank('physics'), chemistry: getRank('chemistry'), biology: getRank('biology'),
+        history: getRank('history'), geography: getRank('geography'), politics: getRank('politics')
+      }
+    });
+  }
+
+  errors.push(...unmatchedNames);
+  return { records, errors };
+}
+
+const SUBJECT_KEY_MAP = {
+  '语文':'chinese','数学':'math','英语':'english',
+  '物理':'physics','化学':'chemistry','生物':'biology',
+  '历史':'history','地理':'geography','政治':'politics'
+};
+const RANK_KEY_MAP = {
+  '总分年级排名':'total','总分排名':'total','年级排名':'total',
+  '语文年级排名':'chinese','语文排名':'chinese',
+  '数学年级排名':'math','数学排名':'math',
+  '英语年级排名':'english','英语排名':'english',
+  '物理年级排名':'physics','物理排名':'physics',
+  '化学年级排名':'chemistry','化学排名':'chemistry',
+  '生物年级排名':'biology','生物排名':'biology',
+  '历史年级排名':'history','历史排名':'history',
+  '地理年级排名':'geography','地理排名':'geography',
+  '政治年级排名':'politics','政治排名':'politics'
+};
+function renderImportPreview(rows) {
+  if (!rows.length) { document.getElementById('import-table-wrap').innerHTML = ''; return; }
+  let html = '<table><thead><tr><th>姓名</th><th>班级</th><th>学年</th><th>考试名称</th><th>语文</th><th>数学</th><th>英语</th><th>总分</th><th>总分排名</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    const total = getTotal(r.scores);
+    const rankTotal = (r.ranks && r.ranks.total) ? r.ranks.total : '—';
+    html += `<tr><td>${r.name}</td><td>${r.class||'—'}</td><td>${r.year||'—'}</td><td>${r.examName||'—'}</td><td>${r.scores.chinese}</td><td>${r.scores.math}</td><td>${r.scores.english}</td><td>${total}</td><td>${rankTotal}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  if (_pendingImport.length > 10) html += `<p style="text-align:center;font-size:0.8rem;color:var(--text-muted);margin-top:8px;">仅显示前 10 条，共 ${_pendingImport.length} 条记录</p>`;
+  document.getElementById('import-table-wrap').innerHTML = html;
+}
+function setImportAlert(msg, type) {
+  const el = document.getElementById('import-alert');
+  el.className = `alert alert-${type} show`;
+  document.getElementById('import-alert-msg').textContent = msg;
+}
+function confirmImport() {
+  if (!_pendingImport.length) return;
+  const records = loadData();
+  const imported = [...records, ..._pendingImport];
+  saveData(imported);
+  _pendingImport = [];
+  setImportAlert(`成功导入 ${imported.length - records.length} 条记录！`, 'success');
+  document.getElementById('confirm-import-btn').style.display = 'none';
+  renderAdminStats();
+  renderAdminTable();
+  document.getElementById('import-progress').style.width = '0';
+}
+function cancelImport() {
+  _pendingImport = [];
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('import-progress').style.width = '0';
+}
+
+// ===================== MANUAL ADD =====================
+function refreshStudentSelect() {
+  const roster = loadRoster();
+  const sel = document.getElementById('m-student-select');
+  if (!sel) return;
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">-- 请选择学生 --</option>';
+  roster.forEach((s, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${s.name}（${s.class || '未分班'}）`;
+    sel.appendChild(opt);
+  });
+  if (currentVal) sel.value = currentVal;
+  sel.onchange = function() {
+    const info = document.getElementById('m-student-info');
+    if (this.value === '') {
+      info.style.display = 'none';
+      return;
+    }
+    const student = roster[parseInt(this.value)];
+    document.getElementById('m-idcard').value = student.idcard;
+    document.getElementById('m-class').value = student.class || '';
+    info.style.display = 'flex';
+  };
+}
+
+function addManualRecord() {
+  const selIdx = document.getElementById('m-student-select').value;
+  if (selIdx === '') { showManualAlert('请选择学生', 'error'); return; }
+  const roster = loadRoster();
+  const student = roster[parseInt(selIdx)];
+  const year = document.getElementById('m-year').value;
+  const examName = document.getElementById('m-exam').value.trim();
+  if (!examName) { showManualAlert('请填写考试名称', 'error'); return; }
+  const record = {
+    id: `manual_${Date.now()}`,
+    name: student.name, idcard: student.idcard, class: student.class || '', year, examName,
+    scores: {
+      chinese: Number(document.getElementById('s-chinese').value)||0,
+      math: Number(document.getElementById('s-math').value)||0,
+      english: Number(document.getElementById('s-english').value)||0,
+      physics: Number(document.getElementById('s-physics').value)||0,
+      chemistry: Number(document.getElementById('s-chemistry').value)||0,
+      biology: Number(document.getElementById('s-biology').value)||0,
+      history: Number(document.getElementById('s-history').value)||0,
+      geography: Number(document.getElementById('s-geography').value)||0,
+      politics: Number(document.getElementById('s-politics').value)||0
+    },
+    ranks: {}
+  };
+  const records = loadData();
+  records.push(record);
+  saveData(records);
+  showManualAlert(`已成功添加 ${student.name} 的 ${examName} 成绩`, 'success');
+  ['m-exam','s-chinese','s-math','s-english','s-physics','s-chemistry','s-biology','s-history','s-geography','s-politics'].forEach(id => { document.getElementById(id).value = ''; });
+  renderAdminStats();
+  renderAdminTable();
+}
+function showManualAlert(msg, type) {
+  const el = document.getElementById('manual-alert');
+  el.className = `alert alert-${type} show`;
+  el.innerHTML = msg;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ===================== TEMPLATE DOWNLOAD =====================
+function downloadTemplate() {
+  if (typeof XLSX === 'undefined') { alert('Excel组件未加载，请检查网络连接后刷新页面'); return; }
+  const headers = ['姓名','班级','学年','考试名称','语文','数学','英语','物理','化学','生物','历史','地理','政治','总分','总分年级排名','语文年级排名','数学年级排名','英语年级排名','物理年级排名','化学年级排名','生物年级排名','历史年级排名','地理年级排名','政治年级排名'];
+  const example = ['张三','1班','高一上学期','期中考试','120','135','118','88','85','80','85','82','90','783','15','32','8','28','45','50','38','42','55','40'];
+  const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '成绩模板');
+  XLSX.writeFile(wb, '成绩导入模板.xlsx');
+}
+
+// ===================== EXPORT =====================
+function exportData() {
+  if (typeof XLSX === 'undefined') { alert('Excel组件未加载，请检查网络连接后刷新页面'); return; }
+  const records = loadData();
+  if (!records.length) { alert('暂无数据可导出'); return; }
+  const rows = [['姓名','身份证号','班级','学年','考试名称','语文','数学','英语','物理','化学','生物','历史','地理','政治','总分','总分年级排名','语文年级排名','数学年级排名','英语年级排名','物理年级排名','化学年级排名','生物年级排名','历史年级排名','地理年级排名','政治年级排名']];
+  records.forEach(r => {
+    const rk = r.ranks || {};
+    rows.push([r.name,r.idcard,r.class||'',r.year,r.examName,
+      r.scores.chinese,r.scores.math,r.scores.english,r.scores.physics,r.scores.chemistry,r.scores.biology,r.scores.history,r.scores.geography,r.scores.politics,
+      getTotal(r.scores),
+      rk.total||'',rk.chinese||'',rk.math||'',rk.english||'',rk.physics||'',rk.chemistry||'',rk.biology||'',rk.history||'',rk.geography||'',rk.politics||''
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '成绩数据');
+  XLSX.writeFile(wb, `成绩数据_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ===================== STUDENT REPORT EXPORT =====================
+function exportStudentReport() {
+  if (typeof XLSX === 'undefined') { alert('Excel组件未加载，请检查网络连接后刷新页面'); return; }
+  if (!_currentRecords.length) { alert('暂无成绩数据可导出'); return; }
+
+  const name = _currentStudentName;
+  const idcard = _currentStudentIdcard;
+  const records = [..._currentRecords].sort((a,b) => getSortOrder(a) - getSortOrder(b));
+  const latest = records[records.length - 1];
+  const totals = records.map(r => getTotal(r.scores));
+  const maxTotal = Math.max(...totals);
+  const avgTotal = Math.round(totals.reduce((a,b)=>a+b,0)/totals.length);
+
+  // Check if we have subject-level ranks
+  const hasSubjectRanks = records.some(r => r.ranks && SUBJECT_KEYS.some(k => r.ranks[k]));
+
+  // Build header
+  const headers = ['序号','学年','考试名称','班级',
+    ...SUBJECTS.map(s => s + '(分)'),
+    '总分',
+    '总分年级排名',
+    ...(hasSubjectRanks ? SUBJECTS.map(s => s + '年级排名') : [])
+  ];
+
+  // Build data rows
+  const rows = records.map((r, i) => {
+    const rk = r.ranks || {};
+    const row = [
+      i + 1,
+      r.year || '',
+      r.examName || '',
+      r.class || '',
+      ...SUBJECT_KEYS.map(k => r.scores[k] != null ? Number(r.scores[k]) : ''),
+      getTotal(r.scores),
+      rk.total || ''
+    ];
+    if (hasSubjectRanks) {
+      SUBJECT_KEYS.forEach(k => row.push(rk[k] || ''));
+    }
+    return row;
+  });
+
+  // Build Excel workbook with formatting
+  const allData = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(allData);
+
+  // Set column widths
+  ws['!cols'] = [
+    {wch:5},  // 序号
+    {wch:12}, // 学年
+    {wch:14}, // 考试名称
+    {wch:8},  // 班级
+    ...SUBJECTS.map(() => ({wch:10})), // 各科分数
+    {wch:8},  // 总分
+    {wch:12}, // 总分年级排名
+    ...(hasSubjectRanks ? SUBJECTS.map(() => ({wch:12})) : []) // 各科排名
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '成绩明细');
+
+  // Add summary sheet
+  const subAvgs = SUBJECT_KEYS.map((k,i) => {
+    const arr = records.map(r => Number(r.scores[k])||0).filter(v => v > 0);
+    return { name: SUBJECTS[i], avg: arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0, count: arr.length };
+  });
+  const best = [...subAvgs].sort((a,b)=>b.avg-a.avg)[0];
+  const worst = [...subAvgs].sort((a,b)=>a.avg-b.avg).find(s=>s.avg>0);
+
+  const summaryData = [
+    ['新安中学2023级学生成绩单'],
+    [''],
+    ['学生姓名', name],
+    ['班级', latest.class || '—'],
+    ['身份证号', idcard ? (idcard.slice(0,6) + '****' + idcard.slice(-4)) : '未录入'],
+    [''],
+    ['考试次数', records.length],
+    ['最高总分', maxTotal],
+    ['平均总分', avgTotal],
+    ['最强科目', best ? best.name + '（均分 ' + best.avg + '）' : '—'],
+    ['待提升科目', worst ? worst.name + '（均分 ' + worst.avg + '）' : '—'],
+    [''],
+    ['各科平均分'],
+    ...subAvgs.map(s => [s.name, s.avg, '（基于 ' + s.count + ' 次考试）']),
+    [''],
+    ['校训：博学笃志，明礼诚信'],
+    [''],
+    ['说明：如对成绩有疑问，请咨询班主任'],
+    ['导出时间', new Date().toLocaleString('zh-CN')]
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws2['!cols'] = [{wch:16}, {wch:30}, {wch:20}];
+  // Merge title row
+  ws2['!merges'] = [{s:{r:0,c:0},e:{r:0,c:2}}];
+
+  XLSX.utils.book_append_sheet(wb, ws2, '成绩概览');
+
+  const filename = `${name}_成绩单_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+// ===================== ROSTER MANAGEMENT =====================
+let _pendingRoster = [];
+
+function handleRosterUpload(input) {
+  if (typeof XLSX === 'undefined') { alert('Excel组件未加载，请检查网络连接后刷新页面'); return; }
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('roster-preview').style.display = '';
+  setRosterAlert('正在解析名册文件...', 'info');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      _pendingRoster = parseRosterRows(rows);
+      const dupes = checkRosterDuplicates(_pendingRoster);
+      if (dupes.length) {
+        setRosterAlert(`解析完成，共 ${_pendingRoster.length} 名学生。注意：以下姓名在名册中重复，将保留第一条记录：${dupes.join('、')}`, 'info');
+      } else {
+        setRosterAlert(`解析完成，共 ${_pendingRoster.length} 名学生，请确认后导入`, 'info');
+      }
+      renderRosterPreview(_pendingRoster.slice(0,10));
+      document.getElementById('confirm-roster-btn').style.display = _pendingRoster.length ? '' : 'none';
+    } catch(err) {
+      setRosterAlert('文件解析失败：' + err.message, 'error');
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseRosterRows(rows) {
+  const nameKeys = ['姓名','名字','学生姓名','学生名字'];
+  const idcardKeys = ['身份证号','身份证','身份证号码','身份号码'];
+  const classKeys = ['班级','班'];
+  return rows.map(row => {
+    const r = {};
+    Object.keys(row).forEach(k => {
+      const kk = k.trim();
+      if (nameKeys.includes(kk)) r.name = String(row[k]).trim();
+      if (idcardKeys.includes(kk)) r.idcard = String(row[k]).trim();
+      if (classKeys.includes(kk)) r.class = String(row[k]).trim();
+    });
+    if (!r.name) return null;
+    return { name: r.name, idcard: r.idcard || '', class: r.class || '' };
+  }).filter(Boolean);
+}
+
+function checkRosterDuplicates(roster) {
+  const nameCount = {};
+  roster.forEach(s => { nameCount[s.name] = (nameCount[s.name]||0)+1; });
+  return Object.keys(nameCount).filter(n => nameCount[n] > 1);
+}
+
+function renderRosterPreview(students) {
+  if (!students.length) { document.getElementById('roster-table-wrap').innerHTML = ''; return; }
+  let html = '<table><thead><tr><th>姓名</th><th>身份证号</th><th>班级</th></tr></thead><tbody>';
+  students.forEach(s => {
+    const idcardDisplay = s.idcard ? s.idcard.slice(0,6)+'****' : '<span style="color:var(--danger);">未填写</span>';
+    html += `<tr><td><strong>${s.name}</strong></td><td>${idcardDisplay}</td><td>${s.class||'—'}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  if (students.length < _pendingRoster.length) html += `<p style="text-align:center;font-size:0.8rem;color:var(--text-muted);margin-top:8px;">仅显示前 10 条，共 ${_pendingRoster.length} 条记录</p>`;
+  document.getElementById('roster-table-wrap').innerHTML = html;
+}
+
+function setRosterAlert(msg, type) {
+  const el = document.getElementById('roster-alert');
+  el.className = `alert alert-${type} show`;
+  document.getElementById('roster-alert-msg').textContent = msg;
+}
+
+function confirmRosterImport() {
+  if (!_pendingRoster.length) return;
+  saveRoster(_pendingRoster);
+  const count = _pendingRoster.length;
+  _pendingRoster = [];
+  document.getElementById('roster-preview').style.display = 'none';
+  document.getElementById('confirm-roster-btn').style.display = 'none';
+  refreshRosterStatus();
+  refreshStudentSelect();
+  renderAdminStats();
+  // Also sync existing records: update idcard/class for records that match by name
+  syncRecordsWithRoster();
+  setRosterAlert(`成功导入 ${count} 名学生到名册！`, 'success');
+}
+
+function cancelRosterImport() {
+  _pendingRoster = [];
+  document.getElementById('roster-preview').style.display = 'none';
+  document.getElementById('confirm-roster-btn').style.display = 'none';
+}
+
+function refreshRosterStatus() {
+  const roster = loadRoster();
+  const statsEl = document.getElementById('roster-stats');
+  if (roster.length) {
+    statsEl.style.display = 'block';
+    document.getElementById('roster-count-badge').textContent = `已录入 ${roster.length} 名学生`;
+    const missingCount = roster.filter(s => !s.idcard).length;
+    const missingBadge = document.getElementById('roster-missing-badge');
+    const supplyBtn = document.getElementById('btn-supply-idcard');
+    if (missingCount > 0) {
+      missingBadge.style.display = '';
+      missingBadge.textContent = `${missingCount} 名学生缺少身份证号`;
+      supplyBtn.style.display = '';
+    } else {
+      missingBadge.style.display = 'none';
+      supplyBtn.style.display = 'none';
+    }
+  } else {
+    statsEl.style.display = 'none';
+  }
+}
+
+function viewRoster() {
+  const roster = loadRoster();
+  if (!roster.length) return;
+  // Show all students in the roster table area
+  let html = '<table><thead><tr><th>序号</th><th>姓名</th><th>身份证号</th><th>班级</th><th>操作</th></tr></thead><tbody>';
+  roster.forEach((s, i) => {
+    const idcardDisplay = s.idcard ? s.idcard.slice(0,6)+'****'+s.idcard.slice(-2) : '<span style="color:var(--danger);font-weight:600;">未填写</span>';
+    const idcardBtn = s.idcard
+      ? `<button class="btn btn-secondary btn-sm" onclick="editRosterIdcard(${i})" style="font-size:0.75rem;padding:4px 8px;">编辑身份证</button>`
+      : `<button class="btn btn-success btn-sm" onclick="editRosterIdcard(${i})" style="font-size:0.75rem;padding:4px 8px;">补录身份证</button>`;
+    html += `<tr><td>${i+1}</td><td><strong>${s.name}</strong></td><td>${idcardDisplay}</td><td>${s.class||'—'}</td><td style="display:flex;gap:6px;flex-wrap:wrap;">${idcardBtn}<button class="btn btn-danger btn-sm" onclick="removeRosterStudent(${i})">删除</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('roster-table-wrap').innerHTML = html;
+  document.getElementById('roster-preview').style.display = '';
+  setRosterAlert(`共 ${roster.length} 名学生`, 'info');
+  document.getElementById('confirm-roster-btn').style.display = 'none';
+}
+
+function removeRosterStudent(idx) {
+  const roster = loadRoster();
+  if (idx >= 0 && idx < roster.length) {
+    const name = roster[idx].name;
+    openModal('确认删除', `确定要从名册中删除"${name}"吗？`, () => {
+      roster.splice(idx, 1);
+      saveRoster(roster);
+      refreshRosterStatus();
+      refreshStudentSelect();
+      renderAdminStats();
+      viewRoster();
+    });
+  }
+}
+
+function clearRoster() {
+  openModal('清空名册', '⚠️ 确定要清空所有学生名册吗？已录入的成绩记录不会被删除，但名册匹配功能将不可用。', () => {
+    saveRoster([]);
+    refreshRosterStatus();
+    refreshStudentSelect();
+    renderAdminStats();
+    document.getElementById('roster-preview').style.display = 'none';
+  });
+}
+
+function syncRecordsWithRoster() {
+  const roster = loadRoster();
+  if (!roster.length) return;
+  const rosterMap = {};
+  roster.forEach(s => { rosterMap[s.name] = s; });
+  const records = loadData();
+  let updated = false;
+  records.forEach(r => {
+    const student = rosterMap[r.name];
+    if (student) {
+      if (!r.idcard && student.idcard) { r.idcard = student.idcard; updated = true; }
+      if (!r.class && student.class) { r.class = student.class; updated = true; }
+    }
+  });
+  if (updated) saveData(records);
+}
+
+// Roster drag & drop
+const rosterZone = document.getElementById('roster-zone');
+rosterZone.addEventListener('dragover', e => { e.preventDefault(); rosterZone.classList.add('drag'); });
+rosterZone.addEventListener('dragleave', () => rosterZone.classList.remove('drag'));
+rosterZone.addEventListener('drop', e => {
+  e.preventDefault(); rosterZone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) { const dt = new DataTransfer(); dt.items.add(file); document.getElementById('roster-file-input').files = dt.files; handleRosterUpload(document.getElementById('roster-file-input')); }
+});
+
+// ===================== ID CARD SUPPLY =====================
+function openIdcardModal() {
+  document.getElementById('idcard-modal').classList.add('show');
+}
+function closeIdcardModal() {
+  document.getElementById('idcard-modal').classList.remove('show');
+}
+function openIdcardSupply() {
+  const roster = loadRoster();
+  const missing = roster.filter(s => !s.idcard);
+  if (!missing.length) {
+    alert('所有学生均已录入身份证号码，无需补录。');
+    return;
+  }
+  let html = '';
+  missing.forEach((s, i) => {
+    html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+      <div style="min-width:80px;font-weight:600;">${s.name}</div>
+      <div style="min-width:60px;font-size:0.8rem;color:var(--text-muted);">${s.class || '—'}</div>
+      <input class="form-input" id="supply-idcard-${i}" type="text" maxlength="18" placeholder="请输入18位身份证号码" style="flex:1;padding:8px 12px;font-size:0.85rem;" data-name="${s.name}" data-index="${roster.indexOf(s)}" />
+      <span id="supply-err-${i}" style="color:var(--danger);font-size:0.78rem;min-width:60px;"></span>
+    </div>`;
+  });
+  document.getElementById('idcard-supply-list').innerHTML = html;
+  openIdcardModal();
+}
+function saveIdcardSupply() {
+  const roster = loadRoster();
+  const inputs = document.querySelectorAll('#idcard-supply-list input[type="text"]');
+  let saved = 0;
+  let hasError = false;
+  inputs.forEach(input => {
+    const idx = parseInt(input.dataset.index);
+    const val = input.value.trim();
+    const errEl = document.getElementById('supply-err-' + input.id.split('-').pop());
+    if (!val) {
+      if (errEl) errEl.textContent = '未填写';
+      hasError = true;
+      return;
+    }
+    if (!validateIdCard(val)) {
+      if (errEl) errEl.textContent = '格式有误';
+      hasError = true;
+      return;
+    }
+    if (idx >= 0 && idx < roster.length) {
+      roster[idx].idcard = val;
+      saved++;
+      if (errEl) errEl.textContent = '';
+    }
+  });
+  if (hasError) return;
+  if (saved > 0) {
+    saveRoster(roster);
+    syncRecordsWithRoster();
+    closeIdcardModal();
+    refreshRosterStatus();
+    refreshStudentSelect();
+    renderAdminStats();
+    alert(`成功为 ${saved} 名学生补录身份证号码！`);
+  }
+}
+// Also allow editing idcard directly in roster view
+function editRosterIdcard(idx) {
+  const roster = loadRoster();
+  if (idx < 0 || idx >= roster.length) return;
+  const student = roster[idx];
+  const newIdcard = prompt(`请输入 ${student.name} 的身份证号码（18位）：`, student.idcard || '');
+  if (newIdcard === null) return;
+  if (newIdcard.trim() && !validateIdCard(newIdcard.trim())) {
+    alert('身份证号码格式不正确，请输入18位身份证号码。');
+    return;
+  }
+  roster[idx].idcard = newIdcard.trim();
+  saveRoster(roster);
+  syncRecordsWithRoster();
+  viewRoster();
+  refreshStudentSelect();
+  refreshRosterStatus();
+}
+
+// ===================== MODAL =====================
+let _modalCallback = null;
+function openModal(title, body, cb) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent = body;
+  _modalCallback = cb;
+  document.getElementById('confirm-modal').classList.add('show');
+}
+function closeModal() { document.getElementById('confirm-modal').classList.remove('show'); _modalCallback = null; }
+document.getElementById('modal-confirm-btn').onclick = () => { const cb = _modalCallback; closeModal(); if (cb) cb(); };
+document.getElementById('confirm-modal').addEventListener('click', function(e) { if(e.target===this) closeModal(); });
+document.getElementById('idcard-modal').addEventListener('click', function(e) { if(e.target===this) closeIdcardModal(); });
+
+// ===================== DRAG & DROP =====================
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) { const dt = new DataTransfer(); dt.items.add(file); document.getElementById('file-input').files = dt.files; handleFileUpload(document.getElementById('file-input')); }
+});
+
+// ===================== SCROLL TOP =====================
+window.addEventListener('scroll', () => {
+  document.getElementById('scroll-top').classList.toggle('show', window.scrollY > 300);
+});
+
+// Enter key support
+document.getElementById('q-idcard').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('q-name').focus(); });
+document.getElementById('q-name').addEventListener('keydown', e => { if(e.key==='Enter') doQuery(); });
+document.getElementById('admin-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>
+
