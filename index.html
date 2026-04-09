@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -905,7 +905,7 @@ const _DATA_INIT_PROMISE = Promise.all([
   fetch('score_data.json?t=' + Date.now())
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data; data.length > 0) {
+      if (data && data.length > 0) {
         _memStore[STORE_KEY] = data;
         try { if (_storageAvailable) localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
         console.log('已从 score_data.json 加载 ' + data.length + ' 条成绩数据');
@@ -915,7 +915,7 @@ const _DATA_INIT_PROMISE = Promise.all([
   fetch('score_roster.json?t=' + Date.now())
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data; data.length > 0) {
+      if (data && data.length > 0) {
         _memStore[ROSTER_KEY] = data;
         try { if (_storageAvailable) localStorage.setItem(ROSTER_KEY, JSON.stringify(data)); } catch(e) {}
         console.log('已从 score_roster.json 加载 ' + data.length + ' 名学生名册');
